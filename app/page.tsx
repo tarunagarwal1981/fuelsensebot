@@ -5,6 +5,7 @@ import { MessageSquare, Send } from 'lucide-react';
 import RoleSelector from '@/components/RoleSelector';
 import MessageBubble from '@/components/MessageBubble';
 import { NotificationPanel } from '@/components/NotificationBadge';
+import CargoSelector from '@/components/CargoSelector';
 import type { Role, ChatMessage, AnalysisResult } from '@/lib/types';
 import { getRoleGreeting } from '@/lib/types';
 import { sampleCargoes } from '@/lib/dummyData';
