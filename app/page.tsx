@@ -84,38 +84,7 @@ export default function Home() {
     let greeting: ChatMessage;
     const roleNotifs = notifications[selectedRole];
 
-    if (roleNotifs.length > 0) {
-      // Show notification summary
-      greeting = {
-        id: Date.now().toString(),
-        role: 'bot',
-        content: `You have ${roleNotifs.length} pending notification${roleNotifs.length > 1 ? 's' : ''}. Let me help you with that.`,
-        timestamp: new Date(),
-        type: 'text'
-      };
-
-      setMessages([greeting]);
-
-      // Add notification details as messages
-      roleNotifs.forEach((notif, idx) => {
-        setTimeout(() => {
-          const notifMsg: ChatMessage = {
-            id: (Date.now() + idx + 1).toString(),
-            role: 'bot',
-            content: `${notif.title}\n${notif.description}`,
-            timestamp: new Date(),
-            type: notif.action ? 'action_buttons' : 'text',
-            actions: notif.action ? [{
-              label: notif.action.label,
-              action: notif.type,
-              cargoId: notif.id
-            }] : undefined
-          };
-          setMessages(prev => [...prev, notifMsg]);
-        }, (idx + 1) * 400);
-      });
-
-    } else if (selectedRole === 'vessel' && (roleNotifs.length > 0 || !robVerified)) {
+    if (selectedRole === 'vessel' && (roleNotifs.length > 0 || !robVerified)) {
       // Vessel review/verify prompt (show if notification exists OR still unverified)
       greeting = {
         id: Date.now().toString(),
@@ -146,6 +115,37 @@ export default function Home() {
         };
         setMessages(prev => [...prev, robMsg]);
       }, 600);
+
+    } else if (roleNotifs.length > 0) {
+      // Show notification summary (for non-vessel roles)
+      greeting = {
+        id: Date.now().toString(),
+        role: 'bot',
+        content: `You have ${roleNotifs.length} pending notification${roleNotifs.length > 1 ? 's' : ''}. Let me help you with that.`,
+        timestamp: new Date(),
+        type: 'text'
+      };
+
+      setMessages([greeting]);
+
+      // Add notification details as messages
+      roleNotifs.forEach((notif, idx) => {
+        setTimeout(() => {
+          const notifMsg: ChatMessage = {
+            id: (Date.now() + idx + 1).toString(),
+            role: 'bot',
+            content: `${notif.title}\n${notif.description}`,
+            timestamp: new Date(),
+            type: notif.action ? 'action_buttons' : 'text',
+            actions: notif.action ? [{
+              label: notif.action.label,
+              action: notif.type,
+              cargoId: notif.id
+            }] : undefined
+          };
+          setMessages(prev => [...prev, notifMsg]);
+        }, (idx + 1) * 400);
+      });
 
     } else if (selectedRole === 'vessel_manager' && (roleNotifs.length > 0 || latestAnalysisResults.length > 0)) {
       greeting = {
