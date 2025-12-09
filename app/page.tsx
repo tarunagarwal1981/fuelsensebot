@@ -252,7 +252,8 @@ export default function Home() {
         }, 500);
       }
     }
-  }, [selectedRole, fixedCargoId, notifications, latestAnalysisResults]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedRole]); // Only reset when role changes, ignore other dependencies to prevent message reset
 
   // Auto-scroll to bottom
   useEffect(() => {
