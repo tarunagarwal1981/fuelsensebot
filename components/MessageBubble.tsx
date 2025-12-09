@@ -61,13 +61,13 @@ export default function MessageBubble({ message, role, onActionClick }: MessageB
           )}
 
           {/* Analysis Cards */}
-          {message.type === 'analysis_cards' && message.analysisData && (
+          {message.type === 'analysis_cards' && message.analysisData && message.analysisData.length > 0 && (
             <div className="space-y-4 mt-2">
               {message.analysisData.map((analysis, index) => {
                 const cargo = sampleCargoes.find(c => c.id === analysis.cargoId);
                 return (
                   <div
-                    key={analysis.cargoId}
+                    key={analysis.cargoId || index}
                     className="animate-fade-in"
                     style={{ animationDelay: `${index * 0.1}s` }}
                   >
@@ -76,6 +76,7 @@ export default function MessageBubble({ message, role, onActionClick }: MessageB
                       role={role}
                       cargo={cargo}
                       isBestOption={analysis.cargoId === bestOptionId}
+                      onFixCargo={(id) => onActionClick?.('fix_cargo', id)}
                     />
                   </div>
                 );

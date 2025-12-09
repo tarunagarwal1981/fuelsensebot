@@ -4,9 +4,33 @@ import { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Send } from 'lucide-react';
 import RoleSelector from '@/components/RoleSelector';
 import MessageBubble from '@/components/MessageBubble';
+import { NotificationPanel } from '@/components/NotificationBadge';
 import type { Role, ChatMessage, AnalysisResult } from '@/lib/types';
 import { getRoleGreeting } from '@/lib/types';
 import { sampleCargoes } from '@/lib/dummyData';
+
+// Notification interface
+interface Notification {
+  id: string;
+  type: 'verify' | 'approve' | 'review' | 'complete';
+  title: string;
+  description: string;
+  timestamp: Date;
+  action?: {
+    label: string;
+    handler: () => void;
+  };
+}
+
+// Format currency helper
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+};
 
 export default function Home() {
   const [selectedRole, setSelectedRole] = useState<Role>('charterer');
@@ -16,20 +40,81 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [robVerified, setRobVerified] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Notifications state
+  const [notifications, setNotifications] = useState<Record<Role, Notification[]>>({
+    charterer: [],
+    operator: [],
+    vessel: [],
+    vessel_manager: []
+  });
+
+  // Notification counts for badges
+  const notificationCounts: Record<Role, number> = {
+    charterer: notifications.charterer.length,
+    operator: notifications.operator.length,
+    vessel: notifications.vessel.length,
+    vessel_manager: notifications.vessel_manager.length
+  };
 
   // Initialize with greeting message when role changes
   useEffect(() => {
     let greeting: ChatMessage;
+    const roleNotifs = notifications[selectedRole];
 
-    if (selectedRole === 'operator' && fixedCargoId) {
-      const fixedCargo = sampleCargoes.find(c => c.id === fixedCargoId);
+    if (roleNotifs.length > 0) {
+      // Show notification summary
       greeting = {
         id: Date.now().toString(),
         role: 'bot',
-        content: `Hi Sarah! 📦 New cargo fixed: ${fixedCargo?.from || 'Port'} → ${fixedCargo?.to || 'Port'} on MV Ocean Pride. Let me get the bunker plan ready for you...`,
+        content: `You have ${roleNotifs.length} pending notification${roleNotifs.length > 1 ? 's' : ''}. Let me help you with that.`,
         timestamp: new Date(),
         type: 'text'
       };
+
+      setMessages([greeting]);
+
+      // Add notification details as messages
+      roleNotifs.forEach((notif, idx) => {
+        setTimeout(() => {
+          const notifMsg: ChatMessage = {
+            id: (Date.now() + idx + 1).toString(),
+            role: 'bot',
+            content: `${notif.title}\n${notif.description}`,
+            timestamp: new Date(),
+            type: notif.action ? 'action_buttons' : 'text',
+            actions: notif.action ? [{
+              label: notif.action.label,
+              action: notif.type,
+              cargoId: notif.id
+            }] : undefined
+          };
+          setMessages(prev => [...prev, notifMsg]);
+        }, (idx + 1) * 400);
+      });
+
+    } else if (selectedRole === 'operator' && fixedCargoId) {
+      greeting = {
+        id: Date.now().toString(),
+        role: 'bot',
+        content: `Hi! Cargo has been fixed. Let me prepare the bunker plan...`,
+        timestamp: new Date(),
+        type: 'text'
+      };
+      setMessages([greeting]);
+
+      // Auto-show bunker options for operator
+      setTimeout(() => {
+        const bunkerMsg: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'bot',
+          content: 'Here are the available bunker ports. You can ask me to show bunker options for the fixed cargo.',
+          timestamp: new Date(),
+          type: 'text'
+        };
+        setMessages(prev => [...prev, bunkerMsg]);
+      }, 800);
+
     } else {
       greeting = {
         id: Date.now().toString(),
@@ -38,10 +123,9 @@ export default function Home() {
         timestamp: new Date(),
         type: 'text'
       };
+      setMessages([greeting]);
     }
-
-    setMessages([greeting]);
-  }, [selectedRole, fixedCargoId]);
+  }, [selectedRole, fixedCargoId, notifications]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -91,12 +175,64 @@ export default function Home() {
       const confirmMsg: ChatMessage = {
         id: Date.now().toString(),
         role: 'bot',
-        content: `✅ Cargo fixed! I've notified the operations team. They'll handle the bunker planning from here.`,
+        content: `✅ Cargo fixed! I've notified the operations team.`,
         timestamp: new Date(),
         type: 'text'
       };
       setMessages(prev => [...prev, confirmMsg]);
       setFixedCargoId(cargoId || null);
+      
+      // Notify operator
+      const fixedCargo = sampleCargoes.find(c => c.id === cargoId);
+      setNotifications(prev => ({
+        ...prev,
+        operator: [...prev.operator, {
+          id: Date.now().toString(),
+          type: 'approve',
+          title: '📦 New Cargo Fixed',
+          description: `${fixedCargo?.from || 'Port'} → ${fixedCargo?.to || 'Port'} cargo ready for bunker planning`,
+          timestamp: new Date(),
+          action: {
+            label: 'Plan Bunker',
+            handler: () => setSelectedRole('operator')
+          }
+        }]
+      }));
+    } else if (action === 'verify') {
+      // Vessel verifies ROBs
+      const verifyMsg: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'bot',
+        content: '✅ ROBs verified! Thank you. The analysis has been updated.',
+        timestamp: new Date(),
+        type: 'text'
+      };
+      setMessages(prev => [...prev, verifyMsg]);
+      
+      // Clear vessel notification
+      setNotifications(prev => ({
+        ...prev,
+        vessel: prev.vessel.filter(n => n.type !== 'verify')
+      }));
+      
+      // Update ROB verified state
+      setRobVerified(true);
+    } else if (action === 'approve') {
+      // Operator approves bunker plan
+      const approveMsg: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'bot',
+        content: '✅ Bunker plan approved! I\'ve notified the vessel and supplier.',
+        timestamp: new Date(),
+        type: 'text'
+      };
+      setMessages(prev => [...prev, approveMsg]);
+      
+      // Clear operator notification
+      setNotifications(prev => ({
+        ...prev,
+        operator: prev.operator.filter(n => n.type !== 'approve')
+      }));
     } else if (action === 'book_bunker' && cargoId) {
       // Find analysis for this cargo
       const analysis = messages
@@ -204,7 +340,9 @@ export default function Home() {
               }
 
               // When analysis is complete
-              if (parsed.analyses) {
+              if (parsed.analyses && Array.isArray(parsed.analyses)) {
+                console.log('Received analyses:', parsed.analyses); // Debug log
+
                 const resultsMsg: ChatMessage = {
                   id: Date.now().toString(),
                   role: 'bot',
@@ -219,32 +357,65 @@ export default function Home() {
                   content: '',
                   timestamp: new Date(),
                   type: 'analysis_cards',
-                  analysisData: parsed.analyses
+                  analysisData: parsed.analyses  // Make sure this is being set correctly
                 };
 
-                // Determine best cargo
-                const bestCargo = parsed.analyses[0].netProfit > parsed.analyses[1].netProfit 
-                  ? parsed.analyses[0] 
-                  : parsed.analyses[1];
-                const bestCargoInfo = sampleCargoes.find(c => c.id === bestCargo.cargoId);
+                // Determine best option
+                const bestCargo = parsed.analyses.reduce((best: AnalysisResult, current: AnalysisResult) => 
+                  current.netProfit > best.netProfit ? current : best
+                );
 
                 const recommendationMsg: ChatMessage = {
                   id: (Date.now() + 2).toString(),
                   role: 'bot',
-                  content: `Based on the analysis, ${bestCargoInfo?.from} → ${bestCargoInfo?.to} shows better economics. Which cargo would you like to fix?`,
+                  content: `Based on the analysis, ${bestCargo.cargoId} shows better economics with ${formatCurrency(bestCargo.netProfit)} net profit. Which cargo would you like to fix?`,
                   timestamp: new Date(),
                   type: 'action_buttons',
-                  actions: parsed.analyses.map((analysis: AnalysisResult) => {
-                    const cargo = sampleCargoes.find(c => c.id === analysis.cargoId);
-                    return {
-                      label: `Fix ${cargo?.to}`,
-                      action: 'fix_cargo',
-                      cargoId: analysis.cargoId
-                    };
-                  })
+                  actions: parsed.analyses.map((a: AnalysisResult) => ({
+                    label: `Fix ${a.cargoId}`,
+                    action: 'fix_cargo',
+                    cargoId: a.cargoId
+                  }))
                 };
 
                 setMessages(prev => [...prev, resultsMsg, cardsMsg, recommendationMsg]);
+                
+                // Create notifications for other roles
+                
+                // Notify vessel to verify ROBs
+                setNotifications(prev => ({
+                  ...prev,
+                  vessel: [...prev.vessel, {
+                    id: Date.now().toString(),
+                    type: 'verify',
+                    title: '⚠️ ROB Verification Needed',
+                    description: 'Current ROBs are unverified. Please confirm fuel levels.',
+                    timestamp: new Date(),
+                    action: {
+                      label: 'Verify ROBs',
+                      handler: () => {
+                        setSelectedRole('vessel');
+                        // Will show verification in vessel chat
+                      }
+                    }
+                  }]
+                }));
+                
+                // Notify vessel manager
+                setNotifications(prev => ({
+                  ...prev,
+                  vessel_manager: [...prev.vessel_manager, {
+                    id: Date.now().toString(),
+                    type: 'review',
+                    title: '📊 New Analysis Available',
+                    description: 'Cargo analysis completed for MV Ocean Pride',
+                    timestamp: new Date(),
+                    action: {
+                      label: 'Review',
+                      handler: () => setSelectedRole('vessel_manager')
+                    }
+                  }]
+                }));
               }
             } catch (e) {
               console.error('Parse error:', e);
@@ -281,7 +452,11 @@ export default function Home() {
 
         {/* Role Selector */}
         <div className="mb-6">
-          <RoleSelector selectedRole={selectedRole} onRoleChange={setSelectedRole} />
+          <RoleSelector 
+            selectedRole={selectedRole} 
+            onRoleChange={setSelectedRole}
+            notifications={notificationCounts}
+          />
         </div>
 
         {/* Chat Interface - Full Height */}
@@ -299,6 +474,13 @@ export default function Home() {
 
           {/* Messages Area - Scrollable */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3 scroll-smooth">
+            {/* Show notifications for current role if any exist */}
+            {notifications[selectedRole].length > 0 && (
+              <div className="mb-4">
+                <NotificationPanel notifications={notifications[selectedRole]} />
+              </div>
+            )}
+            
             {messages.map(msg => (
               <div key={msg.id} className="hover:opacity-95 transition-opacity">
                 <MessageBubble

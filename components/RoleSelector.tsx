@@ -1,60 +1,47 @@
 'use client';
 
-import { User, Building2, Ship, BarChart3 } from 'lucide-react';
+import { Ship, Settings, Anchor, BarChart3 } from 'lucide-react';
 import type { Role } from '@/lib/types';
+import { NotificationBadge } from './NotificationBadge';
 
 interface RoleSelectorProps {
   selectedRole: Role;
   onRoleChange: (role: Role) => void;
+  notifications: Record<Role, number>; // Add this prop
 }
 
-export default function RoleSelector({ selectedRole, onRoleChange }: RoleSelectorProps) {
-  const roles: { value: Role; label: string; icon: React.ReactNode; description: string }[] = [
-    {
-      value: 'charterer',
-      label: 'Charterer',
-      icon: <User className="w-5 h-5" />,
-      description: 'Fix cargo, compare profits',
-    },
-    {
-      value: 'operator',
-      label: 'Operator',
-      icon: <Building2 className="w-5 h-5" />,
-      description: 'Book bunkers, manage operations',
-    },
-    {
-      value: 'vessel',
-      label: 'Vessel',
-      icon: <Ship className="w-5 h-5" />,
-      description: 'Verify ROBs, update position',
-    },
-    {
-      value: 'vessel_manager',
-      label: 'Vessel Manager',
-      icon: <BarChart3 className="w-5 h-5" />,
-      description: 'Fleet overview, strategic metrics',
-    },
+export default function RoleSelector({ selectedRole, onRoleChange, notifications }: RoleSelectorProps) {
+  const roles: { role: Role; label: string; icon: any }[] = [
+    { role: 'charterer', label: 'Charterer', icon: Ship },
+    { role: 'operator', label: 'Operator', icon: Settings },
+    { role: 'vessel', label: 'Vessel', icon: Anchor },
+    { role: 'vessel_manager', label: 'Vessel Manager', icon: BarChart3 }
   ];
 
   return (
-    <div className="flex gap-2 p-4 bg-gray-50 rounded-lg border border-gray-200">
-      {roles.map((role) => (
-        <button
-          key={role.value}
-          onClick={() => onRoleChange(role.value)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all duration-300 ${
-            selectedRole === role.value
-              ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-md scale-105'
-              : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400 hover:scale-102'
-          }`}
-        >
-          {role.icon}
-          <div className="text-left">
-            <div className="font-semibold text-sm">{role.label}</div>
-            <div className="text-xs text-gray-500">{role.description}</div>
-          </div>
-        </button>
-      ))}
+    <div className="flex gap-2 border-b border-gray-200">
+      {roles.map(({ role, label, icon: Icon }) => {
+        const isActive = selectedRole === role;
+        const notifCount = notifications[role] || 0;
+        
+        return (
+          <button
+            key={role}
+            onClick={() => onRoleChange(role)}
+            className={`relative px-4 py-2 font-medium transition-all ${
+              isActive
+                ? 'text-blue-600 border-b-2 border-blue-600'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <Icon className="w-4 h-4" />
+              {label}
+            </div>
+            <NotificationBadge count={notifCount} message={`${notifCount} pending`} />
+          </button>
+        );
+      })}
     </div>
   );
 }
