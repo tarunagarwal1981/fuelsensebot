@@ -37,7 +37,42 @@ export default function MessageBubble({ message, role, onActionClick }: MessageB
       <div className="w-full mb-4 animate-fade-in">
         <div className="w-full space-y-4">
           {message.analysisData.map((analysis, index) => {
-            const cargo = sampleCargoes.find(c => c.id === analysis.cargoId);
+            // Try to find cargo by ID first, then by route matching
+            let cargo = sampleCargoes.find(c => c.id === analysis.cargoId);
+            
+            // If not found by ID, try to match by route (from/to in cargoId or route analysis)
+            if (!cargo) {
+              // Try to extract route info from cargoId or infer from analysis
+              // For now, try matching sample cargoes by checking if cargoId contains route info
+              cargo = sampleCargoes.find(c => 
+                analysis.cargoId.includes(c.from) || 
+                analysis.cargoId.includes(c.to) ||
+                analysis.cargoId === c.id
+              );
+            }
+            
+            // If still not found, create a fallback cargo from analysis data
+            if (!cargo) {
+              // Try to infer from route or use defaults
+              const routeKey = Object.keys(analysis.route || {}).find(k => k.includes('Singapore') || k.includes('US'));
+              if (routeKey?.includes('Singapore')) {
+                cargo = sampleCargoes.find(c => c.to === 'Singapore');
+              } else if (routeKey?.includes('US')) {
+                cargo = sampleCargoes.find(c => c.to === 'US East Coast');
+              }
+            }
+            
+            // Final fallback - use first sample cargo or create default
+            if (!cargo) {
+              cargo = sampleCargoes[index] || sampleCargoes[0] || {
+                id: analysis.cargoId,
+                from: 'Rotterdam',
+                to: analysis.cargoId.includes('Singapore') ? 'Singapore' : 'US East Coast',
+                freight: 700000,
+                loadingDate: new Date().toISOString()
+              };
+            }
+            
             const isBest = analysis.cargoId === bestOptionId;
             
             console.log('🎴 Rendering analysis card:', {
@@ -45,7 +80,8 @@ export default function MessageBubble({ message, role, onActionClick }: MessageB
               cargoId: analysis.cargoId,
               cargo: cargo?.from + ' → ' + cargo?.to,
               isBest,
-              viable: analysis.viable
+              viable: analysis.viable,
+              foundCargo: !!cargo
             });
             
             return (

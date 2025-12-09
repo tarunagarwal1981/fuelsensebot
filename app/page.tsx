@@ -39,6 +39,12 @@ export default function Home() {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [robVerified, setRobVerified] = useState(false);
+  const [showCargoSelector, setShowCargoSelector] = useState(false);
+  const [cargoSelections, setCargoSelections] = useState<{
+    vessel: string;
+    fromPort: string;
+    toPorts: string[];
+  } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Persist analysis results across role changes
@@ -206,11 +212,32 @@ export default function Home() {
       greeting = {
         id: Date.now().toString(),
         role: 'bot',
-        content: getRoleGreeting(selectedRole, 'Tarun'),
+        content: selectedRole === 'charterer' 
+          ? getRoleGreeting(selectedRole, 'Tarun') + '\n\nWould you like to analyze cargo options? Click "Select Cargo" to choose vessel and ports.'
+          : getRoleGreeting(selectedRole, 'Tarun'),
         timestamp: new Date(),
         type: 'text'
       };
       setMessages([greeting]);
+      
+      // For charterer, show cargo selector option
+      if (selectedRole === 'charterer') {
+        setTimeout(() => {
+          const selectorMsg: ChatMessage = {
+            id: (Date.now() + 1).toString(),
+            role: 'bot',
+            content: '',
+            timestamp: new Date(),
+            type: 'action_buttons',
+            actions: [{
+              label: '📋 Select Cargo',
+              action: 'show_cargo_selector',
+              cargoId: undefined
+            }]
+          };
+          setMessages(prev => [...prev, selectorMsg]);
+        }, 500);
+      }
     }
   }, [selectedRole, fixedCargoId, notifications, latestAnalysisResults]);
 
@@ -587,6 +614,16 @@ export default function Home() {
             {notifications[selectedRole].length > 0 && (
               <div className="mb-4">
                 <NotificationPanel notifications={notifications[selectedRole]} />
+              </div>
+            )}
+            
+            {/* Cargo Selector */}
+            {showCargoSelector && (
+              <div className="mb-4">
+                <CargoSelector
+                  onConfirm={handleCargoSelection}
+                  onCancel={() => setShowCargoSelector(false)}
+                />
               </div>
             )}
             

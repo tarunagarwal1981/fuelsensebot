@@ -16,7 +16,7 @@ function delay(ms: number): Promise<void> {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { message, cargoInput } = body;
+    const { message, cargoInput, cargoes } = body;
     const input = message || cargoInput;
 
     // Create a ReadableStream for Server-Sent Events
@@ -46,25 +46,35 @@ export async function POST(request: NextRequest) {
 
           let cargoesToAnalyze: Cargo[] = [];
 
-          if (input) {
-            // Try to parse from user input
+          // Priority 1: Use cargoes from selection interface
+          if (cargoes && Array.isArray(cargoes) && cargoes.length > 0) {
+            cargoesToAnalyze = cargoes.map((c: any, index: number) => ({
+              id: `CARGO-${Date.now()}-${index}`,
+              from: c.from,
+              to: c.to,
+              freight: c.freight || 700000,
+              loadingDate: new Date().toISOString(),
+            }));
+          } else if (input) {
+            // Priority 2: Try to parse from user input
             const parsed = parseCargoInput(input);
             if (parsed) {
-              // Create a cargo from parsed input
               cargoesToAnalyze.push({
                 id: `CARGO-${Date.now()}`,
                 from: parsed.from,
                 to: parsed.to,
-                freight: 700000, // Default freight
+                freight: 700000,
                 loadingDate: new Date().toISOString(),
               });
             }
           }
 
-          // If no valid input, analyze both sample cargoes
+          // Priority 3: Fallback to sample cargoes
           if (cargoesToAnalyze.length === 0) {
-            cargoesToAnalyze = sampleCargoes;
+            cargoesToAnalyze = [...sampleCargoes];
           }
+          
+          console.log(`Analyzing ${cargoesToAnalyze.length} cargoes:`, cargoesToAnalyze.map(c => `${c.from} → ${c.to}`));
 
           // Step 3: Calculate route
           sendStatus('📍 Calculating route requirements...');
