@@ -16,33 +16,39 @@ function delay(ms: number): Promise<void> {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { cargoInput } = body;
+    const { message, cargoInput } = body;
+    const input = message || cargoInput;
 
     // Create a ReadableStream for Server-Sent Events
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
 
-        // Helper to send SSE message
-        const sendMessage = (type: string, data: unknown) => {
-          const message = createSSEMessage(type, data);
+        // Helper to send SSE message in simple format
+        const sendStatus = (status: string) => {
+          const message = `data: ${JSON.stringify({ status })}\n\n`;
+          controller.enqueue(encoder.encode(message));
+        };
+
+        const sendAnalyses = (analyses: AnalysisResult[]) => {
+          const message = `data: ${JSON.stringify({ analyses })}\n\n`;
           controller.enqueue(encoder.encode(message));
         };
 
         try {
           // Step 1: Getting vessel ROBs
-          sendMessage('status', { message: '🔍 Getting vessel ROBs...' });
+          sendStatus('🔍 Getting vessel ROBs...');
           await delay(500);
 
           // Step 2: Parse cargo input
-          sendMessage('status', { message: '📋 Parsing cargo information...' });
+          sendStatus('📋 Parsing cargo information...');
           await delay(500);
 
           let cargoesToAnalyze: Cargo[] = [];
 
-          if (cargoInput) {
+          if (input) {
             // Try to parse from user input
-            const parsed = parseCargoInput(cargoInput);
+            const parsed = parseCargoInput(input);
             if (parsed) {
               // Create a cargo from parsed input
               cargoesToAnalyze.push({
@@ -61,15 +67,15 @@ export async function POST(request: NextRequest) {
           }
 
           // Step 3: Calculate route
-          sendMessage('status', { message: '📍 Calculating route requirements...' });
+          sendStatus('📍 Calculating route requirements...');
           await delay(500);
 
           // Step 4: Finding bunker ports
-          sendMessage('status', { message: '⛽ Finding bunker ports...' });
+          sendStatus('⛽ Finding bunker ports...');
           await delay(500);
 
           // Step 5: Analyzing costs
-          sendMessage('status', { message: '💰 Analyzing costs and profitability...' });
+          sendStatus('💰 Analyzing costs and profitability...');
           await delay(500);
 
           // Analyze each cargo
@@ -79,43 +85,30 @@ export async function POST(request: NextRequest) {
             const cargo = cargoesToAnalyze[i];
             
             if (i > 0) {
-              sendMessage('status', {
-                message: `📊 Analyzing cargo ${i + 1}/${cargoesToAnalyze.length}...`,
-              });
+              sendStatus(`📊 Analyzing cargo ${i + 1}/${cargoesToAnalyze.length}...`);
               await delay(500);
             }
 
             const analysis = analyzeCargo(cargo);
             results.push(analysis);
-
-            // Send individual result
-            sendMessage('result', {
-              cargoId: cargo.id,
-              analysis,
-            });
             await delay(300);
           }
 
           // Step 6: Complete
-          sendMessage('status', { message: '✅ Analysis complete!' });
+          sendStatus('✅ Analysis complete!');
           await delay(300);
 
-          // Send final summary
-          sendMessage('complete', {
-            results,
-            summary: {
-              totalCargoes: results.length,
-              viableCargoes: results.filter((r) => r.viable).length,
-              totalProfit: results.reduce((sum, r) => sum + r.netProfit, 0),
-            },
-          });
+          // Send final analyses
+          sendAnalyses(results);
 
           // Close the stream
+          controller.enqueue(encoder.encode('data: [DONE]\n\n'));
           controller.close();
         } catch (error) {
           const errorMessage =
             error instanceof Error ? error.message : 'Unknown error occurred';
-          sendMessage('error', { message: errorMessage });
+          const errorMsg = `data: ${JSON.stringify({ error: errorMessage })}\n\n`;
+          controller.enqueue(encoder.encode(errorMsg));
           controller.close();
         }
       },
