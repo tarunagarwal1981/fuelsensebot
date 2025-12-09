@@ -93,6 +93,7 @@ export default function MessageBubble({ message, role, onActionClick }: MessageB
                   isBestOption={isBest}
                   onFixCargo={(id) => onActionClick?.('fix_cargo', id)}
                   onBookBunker={(a) => onActionClick?.('book_bunker', a.cargoId)}
+                  onVerifyROB={() => onActionClick?.('verify_rob')}
                 />
               </div>
             );
