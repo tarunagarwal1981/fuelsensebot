@@ -67,8 +67,20 @@ export default function Home() {
     vessel_manager: notifications.vessel_manager.length
   };
 
+  // Track previous role to detect actual role changes
+  const prevRoleRef = useRef<Role>(selectedRole);
+
   // Initialize with greeting message when role changes
   useEffect(() => {
+    // Only reset messages when role actually changes, not when other dependencies change
+    const roleChanged = prevRoleRef.current !== selectedRole;
+    prevRoleRef.current = selectedRole;
+
+    // If role hasn't changed and we already have messages, don't reset
+    if (!roleChanged && messages.length > 0) {
+      return;
+    }
+
     let greeting: ChatMessage;
     const roleNotifs = notifications[selectedRole];
 
