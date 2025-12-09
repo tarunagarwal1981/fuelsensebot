@@ -410,6 +410,7 @@ export default function Home() {
 
             try {
               const parsed = JSON.parse(data);
+              console.log('Parsed SSE data:', parsed); // Debug log
 
               // Add each status update as a bot message
               if (parsed.status) {
@@ -428,7 +429,9 @@ export default function Home() {
 
               // When analysis is complete
               if (parsed.analyses && Array.isArray(parsed.analyses)) {
-                console.log('Received analyses:', parsed.analyses); // Debug log
+                console.log('✅ Received analyses:', parsed.analyses); // Debug log
+                console.log('✅ Analysis count:', parsed.analyses.length);
+                console.log('✅ First analysis:', parsed.analyses[0]);
 
                 // SAVE ANALYSIS RESULTS
                 setLatestAnalysisResults(parsed.analyses);
@@ -450,6 +453,12 @@ export default function Home() {
                   analysisData: parsed.analyses  // Make sure this is being set correctly
                 };
 
+                console.log('✅ Cards message created:', {
+                  type: cardsMsg.type,
+                  hasData: !!cardsMsg.analysisData,
+                  dataLength: cardsMsg.analysisData?.length
+                });
+
                 // Determine best option
                 const bestCargo = parsed.analyses.reduce((best: AnalysisResult, current: AnalysisResult) => 
                   current.netProfit > best.netProfit ? current : best
@@ -468,7 +477,17 @@ export default function Home() {
                   }))
                 };
 
-                setMessages(prev => [...prev, resultsMsg, cardsMsg, recommendationMsg]);
+                console.log('✅ Adding messages to chat:', {
+                  resultsMsg: resultsMsg.id,
+                  cardsMsg: cardsMsg.id,
+                  recommendationMsg: recommendationMsg.id
+                });
+
+                setMessages(prev => {
+                  const newMessages = [...prev, resultsMsg, cardsMsg, recommendationMsg];
+                  console.log('✅ Total messages after adding:', newMessages.length);
+                  return newMessages;
+                });
                 
                 // Create notifications for other roles
                 

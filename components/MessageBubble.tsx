@@ -31,6 +31,41 @@ export default function MessageBubble({ message, role, onActionClick }: MessageB
       ).cargoId
     : null;
 
+  // Special handling for analysis_cards - render full width
+  if (message.type === 'analysis_cards' && message.analysisData && message.analysisData.length > 0) {
+    return (
+      <div className="w-full mb-4 animate-fade-in">
+        <div className="w-full space-y-4">
+          {message.analysisData.map((analysis, index) => {
+            const cargo = sampleCargoes.find(c => c.id === analysis.cargoId);
+            const isBest = analysis.cargoId === bestOptionId;
+            
+            console.log('🎴 Rendering analysis card:', {
+              index,
+              cargoId: analysis.cargoId,
+              cargo: cargo?.from + ' → ' + cargo?.to,
+              isBest,
+              viable: analysis.viable
+            });
+            
+            return (
+              <div key={analysis.cargoId || `analysis-${index}`} className="w-full">
+                <AnalysisCard
+                  analysis={analysis}
+                  role={role}
+                  cargo={cargo}
+                  isBestOption={isBest}
+                  onFixCargo={(id) => onActionClick?.('fix_cargo', id)}
+                  onBookBunker={(a) => onActionClick?.('book_bunker', a.cargoId)}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`flex w-full mb-4 animate-fade-in ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-full w-full`}>
@@ -74,28 +109,6 @@ export default function MessageBubble({ message, role, onActionClick }: MessageB
           </div>
         )}
 
-        {/* Analysis Cards - FULL WIDTH, OUTSIDE bubble */}
-        {message.type === 'analysis_cards' && message.analysisData && message.analysisData.length > 0 && (
-          <div className="w-full space-y-4">
-            {message.analysisData.map((analysis, index) => {
-              const cargo = sampleCargoes.find(c => c.id === analysis.cargoId);
-              const isBest = analysis.cargoId === bestOptionId;
-              
-              return (
-                <div key={analysis.cargoId || index} className="w-full">
-                  <AnalysisCard
-                    analysis={analysis}
-                    role={role}
-                    cargo={cargo}
-                    isBestOption={isBest}
-                    onFixCargo={(id) => onActionClick?.('fix_cargo', id)}
-                    onBookBunker={(a) => onActionClick?.('book_bunker', a.cargoId)}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        )}
 
         {/* Timestamp */}
         {message.type !== 'analysis_cards' && (
