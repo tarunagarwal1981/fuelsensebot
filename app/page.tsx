@@ -120,7 +120,7 @@ export default function Home() {
       greeting = {
         id: Date.now().toString(),
         role: 'bot',
-        content: `Good day! ⚓ You have ROBs pending verification.`,
+        content: `Good day! ⚓ Please review your ROBs before verification.`,
         timestamp: new Date(),
         type: 'text'
       };
@@ -131,12 +131,12 @@ export default function Home() {
         const robMsg: ChatMessage = {
           id: (Date.now() + 1).toString(),
           role: 'bot',
-          content: `Current ROBs (Unverified):\n\n📊 VLSFO: 180 MT\n📊 LSMGO: 45 MT\n\n⚠️ These values are being used for analysis but need your confirmation.`,
+          content: `Current ROBs (Unverified):\n\n📊 VLSFO: 180 MT\n📊 LSMGO: 45 MT\n\nReview these values. Confirm when ready.`,
           timestamp: new Date(),
           type: 'action_buttons',
           actions: [{
-            label: '✅ Verify ROBs',
-            action: 'verify',
+            label: '✅ Review & Verify ROBs',
+            action: 'verify_all_robs',
             cargoId: 'rob-verification'
           }, {
             label: '✏️ Edit & Verify',
@@ -285,8 +285,38 @@ export default function Home() {
     setMessages(prev => [...prev, bookingMessage]);
   };
 
+  // Mark all analyses and chat cards as ROB-verified
+  const markAnalysesVerified = () => {
+    setLatestAnalysisResults(prev =>
+      prev.map(a => ({
+        ...a,
+        currentROB: { ...a.currentROB, verified: true, vesselConfirmed: true },
+        estimatedDepartureROB: { ...a.estimatedDepartureROB, verified: true, vesselConfirmed: true },
+      }))
+    );
+
+    setMessages(prev =>
+      prev.map(m => {
+        if (!m.analysisData) return m;
+        const updated = m.analysisData.map(a => {
+          const match = latestAnalysisResults.find(u => u.cargoId === a.cargoId);
+          if (match) {
+            return {
+              ...a,
+              currentROB: { ...a.currentROB, verified: true, vesselConfirmed: true },
+              estimatedDepartureROB: { ...a.estimatedDepartureROB, verified: true, vesselConfirmed: true },
+            };
+          }
+          return a;
+        });
+        return { ...m, analysisData: updated };
+      })
+    );
+  };
+
   const handleVerifyROB = () => {
     setRobVerified(true);
+    markAnalysesVerified();
     
     const verifyMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -487,7 +517,7 @@ export default function Home() {
           }
         }]
       }));
-    } else if (action === 'verify') {
+    } else if (action === 'verify' || action === 'verify_all_robs') {
       // Vessel verifies ROBs
       const verifyMsg: ChatMessage = {
         id: Date.now().toString(),
