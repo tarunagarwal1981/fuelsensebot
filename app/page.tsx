@@ -285,7 +285,168 @@ export default function Home() {
     setMessages(prev => [...prev, verifyMessage]);
   };
 
+  const handleCargoSelection = (selections: {
+    vessel: string;
+    fromPort: string;
+    toPorts: string[];
+  }) => {
+    setShowCargoSelector(false);
+    
+    // Create cargoes from selections
+    const cargoes = selections.toPorts.map((toPort, index) => ({
+      id: `CARGO-${Date.now()}-${index}`,
+      from: selections.fromPort,
+      to: toPort,
+      freight: toPort.includes('Singapore') ? 850000 : 620000,
+      loadingDate: new Date().toISOString(),
+    }));
+    
+    // Add confirmation message
+    const confirmMsg: ChatMessage = {
+      id: Date.now().toString(),
+      role: 'bot',
+      content: `✅ Analyzing ${selections.toPorts.length} cargo option${selections.toPorts.length > 1 ? 's' : ''}:\n\n🚢 Vessel: ${selections.vessel}\n📍 From: ${selections.fromPort}\n🎯 To: ${selections.toPorts.join(', ')}\n\nLet me calculate the bunker requirements...`,
+      timestamp: new Date(),
+      type: 'text'
+    };
+    setMessages(prev => [...prev, confirmMsg]);
+    
+    // Trigger analysis using existing handleSendMessage logic but with cargoes
+    setTimeout(async () => {
+      setIsLoading(true);
+      try {
+        const response = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            cargoes: cargoes.map(c => ({
+              from: c.from,
+              to: c.to,
+              freight: c.freight
+            }))
+          })
+        });
+
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.body) throw new Error('No response body');
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6).trim();
+              if (data === '[DONE]') continue;
+
+              try {
+                const parsed = JSON.parse(data);
+                if (parsed.status) {
+                  const statusMsg: ChatMessage = {
+                    id: Date.now().toString() + Math.random(),
+                    role: 'bot',
+                    content: parsed.status,
+                    timestamp: new Date(),
+                    type: 'text'
+                  };
+                  setMessages(prev => [...prev, statusMsg]);
+                  await new Promise(resolve => setTimeout(resolve, 400));
+                }
+
+                if (parsed.analyses && Array.isArray(parsed.analyses)) {
+                  setLatestAnalysisResults(parsed.analyses);
+                  const resultsMsg: ChatMessage = {
+                    id: Date.now().toString(),
+                    role: 'bot',
+                    content: `Here's my analysis for ${parsed.analyses.length} cargo option${parsed.analyses.length > 1 ? 's' : ''}:`,
+                    timestamp: new Date(),
+                    type: 'text'
+                  };
+                  const cardsMsg: ChatMessage = {
+                    id: (Date.now() + 1).toString(),
+                    role: 'bot',
+                    content: '',
+                    timestamp: new Date(),
+                    type: 'analysis_cards',
+                    analysisData: parsed.analyses
+                  };
+                  const bestCargo = parsed.analyses.reduce((best: AnalysisResult, current: AnalysisResult) => 
+                    current.netProfit > best.netProfit ? current : best
+                  );
+                  const recommendationMsg: ChatMessage = {
+                    id: (Date.now() + 2).toString(),
+                    role: 'bot',
+                    content: `Based on the analysis, ${bestCargo.cargoId} shows better economics with ${formatCurrency(bestCargo.netProfit)} net profit. Which cargo would you like to fix?`,
+                    timestamp: new Date(),
+                    type: 'action_buttons',
+                    actions: parsed.analyses.map((a: AnalysisResult) => ({
+                      label: `Fix ${a.cargoId}`,
+                      action: 'fix_cargo',
+                      cargoId: a.cargoId
+                    }))
+                  };
+                  setMessages(prev => [...prev, resultsMsg, cardsMsg, recommendationMsg]);
+                  setNotifications(prev => ({
+                    ...prev,
+                    vessel: [...prev.vessel, {
+                      id: Date.now().toString(),
+                      type: 'verify',
+                      title: '⚠️ ROB Verification Needed',
+                      description: 'Current ROBs are unverified. Please confirm fuel levels.',
+                      timestamp: new Date(),
+                      action: {
+                        label: 'Verify ROBs',
+                        handler: () => setSelectedRole('vessel')
+                      }
+                    }],
+                    vessel_manager: [...prev.vessel_manager, {
+                      id: Date.now().toString(),
+                      type: 'review',
+                      title: '📊 New Analysis Available',
+                      description: 'Cargo analysis completed for MV Ocean Pride',
+                      timestamp: new Date(),
+                      action: {
+                        label: 'Review',
+                        handler: () => setSelectedRole('vessel_manager')
+                      }
+                    }]
+                  }));
+                }
+              } catch (e) {
+                console.error('Parse error:', e);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        const errorMsg: ChatMessage = {
+          id: Date.now().toString(),
+          role: 'bot',
+          content: "Sorry, I encountered an error. Please try again.",
+          timestamp: new Date(),
+          type: 'text'
+        };
+        setMessages(prev => [...prev, errorMsg]);
+      } finally {
+        setIsLoading(false);
+      }
+    }, 800);
+  };
+
   const handleMessageAction = (action: string, cargoId?: string) => {
+    if (action === 'show_cargo_selector') {
+      setShowCargoSelector(true);
+      return;
+    }
     if (action === 'fix_cargo') {
       const confirmMsg: ChatMessage = {
         id: Date.now().toString(),
