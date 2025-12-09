@@ -41,6 +41,9 @@ export default function Home() {
   const [robVerified, setRobVerified] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
+  // Persist analysis results across role changes
+  const [latestAnalysisResults, setLatestAnalysisResults] = useState<AnalysisResult[]>([]);
+  
   // Notifications state
   const [notifications, setNotifications] = useState<Record<Role, Notification[]>>({
     charterer: [],
@@ -93,6 +96,90 @@ export default function Home() {
         }, (idx + 1) * 400);
       });
 
+    } else if (selectedRole === 'vessel' && roleNotifs.length > 0) {
+      // Vessel has verification notification
+      greeting = {
+        id: Date.now().toString(),
+        role: 'bot',
+        content: `Good day! ⚓ You have ROBs pending verification.`,
+        timestamp: new Date(),
+        type: 'text'
+      };
+      setMessages([greeting]);
+
+      // Show current ROBs that need verification
+      setTimeout(() => {
+        const robMsg: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'bot',
+          content: `Current ROBs (Unverified):\n\n📊 VLSFO: 180 MT\n📊 LSMGO: 45 MT\n\n⚠️ These values are being used for analysis but need your confirmation.`,
+          timestamp: new Date(),
+          type: 'action_buttons',
+          actions: [{
+            label: '✅ Verify ROBs',
+            action: 'verify',
+            cargoId: 'rob-verification'
+          }, {
+            label: '✏️ Edit & Verify',
+            action: 'edit_rob',
+            cargoId: 'rob-edit'
+          }]
+        };
+        setMessages(prev => [...prev, robMsg]);
+      }, 600);
+
+    } else if (selectedRole === 'vessel_manager' && (roleNotifs.length > 0 || latestAnalysisResults.length > 0)) {
+      greeting = {
+        id: Date.now().toString(),
+        role: 'bot',
+        content: latestAnalysisResults.length > 0 
+          ? `Welcome! 📊 Cargo analysis available for review.`
+          : `Welcome! 📊 You have ${roleNotifs.length} pending notification(s).`,
+        timestamp: new Date(),
+        type: 'text'
+      };
+      setMessages([greeting]);
+
+      if (latestAnalysisResults.length > 0) {
+        setTimeout(() => {
+          const summaryMsg: ChatMessage = {
+            id: (Date.now() + 1).toString(),
+            role: 'bot',
+            content: `Analysis Summary for MV Ocean Pride:`,
+            timestamp: new Date(),
+            type: 'text'
+          };
+
+          const analysisMsg: ChatMessage = {
+            id: (Date.now() + 2).toString(),
+            role: 'bot',
+            content: '',
+            timestamp: new Date(),
+            type: 'analysis_cards',
+            analysisData: latestAnalysisResults
+          };
+
+          setMessages(prev => [...prev, summaryMsg, analysisMsg]);
+        }, 600);
+      } else if (roleNotifs.length > 0) {
+        // Fallback: show text summary
+        setTimeout(() => {
+          const summaryMsg: ChatMessage = {
+            id: (Date.now() + 1).toString(),
+            role: 'bot',
+            content: `📊 Fleet Overview:\n\n✅ MV Ocean Pride: 2 cargoes analyzed\n⚠️ ROBs unverified (pending vessel confirmation)\n💰 Best option: Singapore route ($287K profit)\n🚨 Action needed: Approve charterer's cargo selection`,
+            timestamp: new Date(),
+            type: 'action_buttons',
+            actions: [{
+              label: 'View Full Analysis',
+              action: 'review',
+              cargoId: 'vessel-manager-review'
+            }]
+          };
+          setMessages(prev => [...prev, summaryMsg]);
+        }, 600);
+      }
+
     } else if (selectedRole === 'operator' && fixedCargoId) {
       greeting = {
         id: Date.now().toString(),
@@ -125,7 +212,7 @@ export default function Home() {
       };
       setMessages([greeting]);
     }
-  }, [selectedRole, fixedCargoId, notifications]);
+  }, [selectedRole, fixedCargoId, notifications, latestAnalysisResults]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -342,6 +429,9 @@ export default function Home() {
               // When analysis is complete
               if (parsed.analyses && Array.isArray(parsed.analyses)) {
                 console.log('Received analyses:', parsed.analyses); // Debug log
+
+                // SAVE ANALYSIS RESULTS
+                setLatestAnalysisResults(parsed.analyses);
 
                 const resultsMsg: ChatMessage = {
                   id: Date.now().toString(),
