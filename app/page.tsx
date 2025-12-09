@@ -115,8 +115,8 @@ export default function Home() {
         }, (idx + 1) * 400);
       });
 
-    } else if (selectedRole === 'vessel' && roleNotifs.length > 0) {
-      // Vessel has verification notification
+    } else if (selectedRole === 'vessel' && (roleNotifs.length > 0 || !robVerified)) {
+      // Vessel review/verify prompt (show if notification exists OR still unverified)
       greeting = {
         id: Date.now().toString(),
         role: 'bot',
