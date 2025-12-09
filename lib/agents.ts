@@ -114,7 +114,7 @@ export function calculateRouteRequirements(
     },
   };
 
-  const routeData = knownRoutes[routeKey];
+  let routeData = knownRoutes[routeKey];
   
   if (!routeData) {
     // Default route calculation if not in known routes

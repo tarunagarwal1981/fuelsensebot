@@ -103,10 +103,15 @@ export default function AnalysisCard({
             <Fuel className="w-4 h-4 text-gray-500" />
             <span className="text-sm font-semibold text-gray-700">
               Current ROB
-              {!analysis.currentROB.verified && (
+              {!analysis.currentROB.verified ? (
                 <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full">
                   <AlertTriangle className="w-3 h-3" />
                   Unverified
+                </span>
+              ) : (
+                <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                  <CheckCircle2 className="w-3 h-3" />
+                  Verified
                 </span>
               )}
             </span>

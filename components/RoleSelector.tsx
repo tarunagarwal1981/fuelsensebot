@@ -42,10 +42,10 @@ export default function RoleSelector({ selectedRole, onRoleChange }: RoleSelecto
         <button
           key={role.value}
           onClick={() => onRoleChange(role.value)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all duration-300 ${
             selectedRole === role.value
-              ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-md'
-              : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400'
+              ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-md scale-105'
+              : 'bg-white border-gray-300 text-gray-700 hover:border-gray-400 hover:scale-102'
           }`}
         >
           {role.icon}
